@@ -13,48 +13,47 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Database Connection
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
-
-if not url or not key:
-    supabase = None
-else:
-    supabase = create_client(url, key)
+# Initialize Supabase
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
+supabase = create_client(url, key) if url and key else None
 
 @app.post("/api/v1/orders")
 async def process_order(payload: dict):
+    print(f"DEBUG: Received payload: {payload}")
+    
     if not supabase:
-        raise HTTPException(status_code=500, detail="Database not configured")
+        raise HTTPException(status_code=500, detail="Database not initialized")
 
     try:
+        # Extract data
         guest_count = payload.get("guest_count", 1)
         items = payload.get("items", [])
         
-        # CHANGED: table_number is now 0 (integer) instead of "N/A" (text)
+        # Prepare Order
         order_data = {"table_number": 0, "guest_count": guest_count}
+        print(f"DEBUG: Inserting order: {order_data}")
         
         order_response = supabase.table("orders").insert(order_data).execute()
-        
-        if not order_response.data:
-            raise Exception("Failed to insert order")
-            
         order_id = order_response.data[0]["id"]
+        print(f"DEBUG: Order created with ID: {order_id}")
 
+        # Prepare Items
         if items:
             formatted_items = [
                 {
                     "order_id": order_id, 
-                    "item_name": item.get("name", "Unknown"), 
+                    "menu_item_id": item.get("id"),  # FIXED: Matches your database schema exactly
                     "customer_note": item.get("note", ""), 
                     "status": "Placed"
                 }
                 for item in items
             ]
+            print(f"DEBUG: Inserting items: {formatted_items}")
             supabase.table("order_items").insert(formatted_items).execute()
             
         return {"status": "success", "order_id": order_id}
         
     except Exception as e:
-        print(f"Error processing order: {str(e)}")
+        print(f"DEBUG: CRITICAL ERROR - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
