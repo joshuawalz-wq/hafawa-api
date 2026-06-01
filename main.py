@@ -43,7 +43,7 @@ async def process_order(payload: dict):
             formatted_items = [
                 {
                     "order_id": order_id, 
-                    "menu_item_id": item.get("id"),  # FIXED: Matches your database schema exactly
+                    "menu_item_id": item.get("id"),
                     "customer_note": item.get("note", ""), 
                     "status": "Placed"
                 }
@@ -56,4 +56,28 @@ async def process_order(payload: dict):
         
     except Exception as e:
         print(f"DEBUG: CRITICAL ERROR - {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/orders")
+async def get_orders():
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not initialized")
+        
+    try:
+        # Fetch all orders (newest first)
+        orders_response = supabase.table("orders").select("*").order("created_at", desc=True).execute()
+        orders = orders_response.data
+        
+        # Fetch all items
+        items_response = supabase.table("order_items").select("*").execute()
+        items = items_response.data
+        
+        # Combine items into their respective orders
+        for order in orders:
+            order["items"] = [item for item in items if item["order_id"] == order["id"]]
+            
+        return {"status": "success", "data": orders}
+        
+    except Exception as e:
+        print(f"DEBUG: Fetch error - {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
