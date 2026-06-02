@@ -26,12 +26,13 @@ async def process_order(payload: dict):
         raise HTTPException(status_code=500, detail="Database not initialized")
 
     try:
-        # Extract data
+        # Extract data (Now including table_number!)
+        table_number = int(payload.get("table_number", 0))
         guest_count = payload.get("guest_count", 1)
         items = payload.get("items", [])
         
         # Prepare Order
-        order_data = {"table_number": 0, "guest_count": guest_count}
+        order_data = {"table_number": table_number, "guest_count": guest_count}
         print(f"DEBUG: Inserting order: {order_data}")
         
         order_response = supabase.table("orders").insert(order_data).execute()
